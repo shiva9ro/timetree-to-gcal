@@ -1,170 +1,126 @@
 # TimeTree to Google Calendar
 
-TimeTree の予定を ICS に書き出して、必要なら Google Calendar にコピーするための作業フォルダです。
+TimeTreeの予定を差分取得し、Google Calendarへ同期する非公式ツールです。
+Alexaの定型アクションから当日・翌日の予定を読み上げる用途を想定しています。
 
-TimeTree から ICS を作る部分は、非公式ツール [eoleedi/TimeTree-Exporter](https://github.com/eoleedi/TimeTree-exporter) を使います。
+## Features
 
-## 1. セットアップ
+- 初回のみTimeTreeのイベントを全件取得
+- 2回目以降は `since` カーソルによる差分取得
+- Google Calendarへの新規作成・変更・削除
+- TimeTreeのラベル名を `【ラベル名】予定タイトル` として反映
+- ローカルキャッシュによる同期範囲への予定追加
+- Windows PowerShellとLinux/Raspberry Piに対応
+
+## Requirements
+
+- Python 3.11以上
+- Google Calendar APIのDesktop OAuthクライアント
+- TimeTreeのメールアドレス、パスワード、カレンダーコード
+
+## Setup
+
+### Windows
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-インストール確認:
-
-```powershell
-.\.venv\Scripts\timetree-exporter.exe --help
-```
-
-## 2. TimeTreeからICSを作る
-
-一番シンプルな実行:
-
-```powershell
-.\.venv\Scripts\timetree-exporter.exe -o .\timetree.ics
-```
-
-実行すると、TimeTree のメールアドレスとパスワードの入力、エクスポートするカレンダーの選択を求められます。
-成功すると、このフォルダに `timetree.ics` ができます。
-
-メールアドレスだけ先に指定する場合:
-
-```powershell
-.\.venv\Scripts\timetree-exporter.exe -e your-email@example.com -o .\timetree.ics
-```
-
-カレンダーコードが分かっている場合:
-
-```powershell
-.\.venv\Scripts\timetree-exporter.exe -e your-email@example.com -c calendar_code -o .\timetree.ics
-```
-
-カレンダーコードは、TimeTree Web版のカレンダーページURLや、`-c` なしで実行したときの選択画面で確認します。
-
-## 3. パスワードを毎回入力したくない場合
-
-PowerShell の環境変数で渡せます。
-
-```powershell
-$env:TIMETREE_EMAIL="your-email@example.com"
-$env:TIMETREE_PASSWORD="your-password"
-.\.venv\Scripts\timetree-exporter.exe -o .\timetree.ics
-```
-
-ただし、まずは手入力で動作確認するのがおすすめです。パスワードをコマンド引数に直接書くより安全です。
-
-## 4. 作ったICSを確認する
-
-Google Calendar に書き込まず、ICS が読めるかだけ確認します。
-
-```powershell
-.\.venv\Scripts\python.exe -m time_tree_exporter sync --ics .\timetree.ics --calendar-id primary --dry-run
-```
-
-## 5. Google Calendarへコピーする
-
-Google Calendar API の `credentials.json` をこのフォルダに置いたあと実行します。
-
-```powershell
-.\.venv\Scripts\python.exe -m time_tree_exporter sync --ics .\timetree.ics --calendar-id primary
-```
-
-初回だけブラウザで Google 認証が開き、認証後に `token.json` が作られます。
-
-## 6. WindowsでTimeTree取得からGoogle同期まで一発で動かす
-
-TimeTreeのメールアドレスとパスワードを `.env` に入れます。
-
-```powershell
 Copy-Item .\.env.example .\.env
 notepad .\.env
 ```
 
-`.env` の中身:
+### Linux / Raspberry Pi
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env
+chmod 600 .env credentials.json token.json
+```
+
+## Configuration
+
+`.env`:
 
 ```text
 TIMETREE_EMAIL=your-email@example.com
 TIMETREE_PASSWORD=your-password
 TIMETREE_CALENDAR_CODE=your-calendar-code
+GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
 ```
 
-`.env` は `.gitignore` で除外しています。
+Google Cloudで作成したOAuthクライアントを `credentials.json` として配置します。
+初回認証後は `token.json` が作成されます。
 
-PowerShellの環境変数で渡すこともできます。
+これらのファイルはGit管理対象外です。
+
+## Run
+
+### Windows
 
 ```powershell
-$env:TIMETREE_EMAIL="your-email@example.com"
-$env:TIMETREE_PASSWORD="your-password"
+.\sync-timetree.ps1 -CalendarId "GoogleカレンダーID"
 ```
 
-まずはGoogleへ書き込まずに確認します。
+`.env` に `GOOGLE_CALENDAR_ID` があれば、Python CLIを直接実行することもできます。
 
 ```powershell
-.\sync-timetree.ps1 -CalendarId primary -DryRun
+.\.venv\Scripts\python.exe -m time_tree_exporter sync-timetree
 ```
 
-問題なければ同期します。
-
-```powershell
-.\sync-timetree.ps1 -CalendarId primary
-```
-
-カレンダーコードをコマンドで指定する場合:
-
-```powershell
-.\sync-timetree.ps1 -CalendarId primary -CalendarCode "your_timetree_calendar_code"
-```
-
-同期範囲を変える場合:
-
-```powershell
-.\sync-timetree.ps1 -CalendarId primary -DaysBack 1 -DaysAhead 60
-```
-
-TimeTreeから消えた予定をGoogle側からも消したい場合:
-
-```powershell
-.\sync-timetree.ps1 -CalendarId primary -DeleteMissing
-```
-
-`-DeleteMissing` は、このツールがGoogle Calendar APIで作った予定だけを対象にします。
-手動ICSインポートで入れた予定には同期用IDが付いていないため、削除対象になりません。
-
-## 差分同期
-
-`sync-timetree.ps1` は、通常はTimeTreeの差分APIを使います。
-
-- 初回だけ全イベントを取得し、`timetree-cache.json` に保存します。
-- 最大 `updated_at + 1` を `sync-state.json` に保存します。
-- 2回目以降は `/events?since=...` で変更分だけ取得します。
-- 変更がなければ、TimeTreeのイベント取得は1リクエストで終了します。
-- `deactivated_at` が付いた変更イベントは、Google Calendarからも削除します。
-- Google Calendarへは、変更された予定だけを作成・更新します。
-- 日付が変わったときは、新しく同期範囲へ入った予定だけをGoogle Calendarへ追加します。
-- TimeTreeの変更も同期範囲の変化もなければ、Google Calendar APIの予定操作は0件です。
-- TimeTreeのラベル名をキャッシュし、Googleの予定名を `【ラベル名】予定タイトル` にします。
-
-キャッシュを作り直して全件確認したい場合:
-
-```powershell
-.\sync-timetree.ps1 -CalendarId "GoogleカレンダーID" -FullRefresh
-```
-
-Alexaが朝07:45、夜20:45に読み上げる場合、Windowsタスクスケジューラやcronでは07:35と20:35の同期を推奨します。
-
-## Raspberry Pi / Linux
-
-Linuxでは `.env` に `GOOGLE_CALENDAR_ID` も設定し、次を実行します。
+### Linux / Raspberry Pi
 
 ```bash
 ./sync-timetree.sh
 ```
 
-systemdのユーザーサービス例は `deploy/systemd` にあります。`%h/timetree-to-gcal` に配置する前提です。
+キャッシュを破棄して全件取得し直す場合:
 
-## メモ
+```powershell
+.\sync-timetree.ps1 -CalendarId "GoogleカレンダーID" -FullRefresh
+```
 
-- `timetree-exporter` は TimeTree 公式ではない非公式ツールです。TimeTree側の仕様変更で動かなくなる可能性があります。
-- Google Calendar に取り込むときは、まず専用カレンダーを作って試すのがおすすめです。失敗してもそのカレンダーを消せます。
-- `credentials.json`、`token.json`、`.ics` は `.gitignore` で除外しています。
+```bash
+.venv/bin/python -m time_tree_exporter sync-timetree --full-refresh
+```
+
+## Delta Sync
+
+- 初回イベントを `timetree-cache.json` に保存します。
+- 最大 `updated_at + 1` を `sync-state.json` に保存します。
+- 以後は `/events?since=...` から変更分だけ取得します。
+- `deactivated_at` が設定された予定はGoogle Calendarから削除します。
+- 日付が変わると、新しく同期範囲へ入った予定だけをGoogle Calendarへ追加します。
+- 変更がなければ、TimeTreeは1リクエスト、Googleの予定操作は0件です。
+
+## Scheduling
+
+Alexaが07:45と20:45に読み上げる場合、07:35と20:35の同期を想定しています。
+
+systemdのユーザーサービスとタイマー例は `deploy/systemd` にあります。
+配置先は `%h/timetree-to-gcal` です。
+
+## Security
+
+次のファイルはGitへ追加しないでください。
+
+```text
+.env
+credentials.json
+token.json
+sync-state.json
+timetree-cache.json
+timetree-labels.json
+```
+
+## Disclaimer
+
+このプロジェクトはTimeTree公式ではありません。TimeTreeの内部APIを利用しているため、
+仕様変更によって動作しなくなる可能性があります。短い間隔でのポーリングは避けてください。
+
+## Acknowledgements
+
+内部APIの調査と初期ICS出力の検証では、MIT Licenseの
+[eoleedi/TimeTree-Exporter](https://github.com/eoleedi/TimeTree-exporter) を参考にしました。
+現在の通常同期は同パッケージを依存関係として使用せず、
+このプロジェクト内の差分同期クライアントで動作します。

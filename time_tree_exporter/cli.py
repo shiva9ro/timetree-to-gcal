@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
-import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.request import urlopen
@@ -291,19 +289,6 @@ def _parse_optional_date(value: str | None) -> date | None:
 
 def _unique_events(events: list[IcsEvent]) -> list[IcsEvent]:
     return list({event.uid: event for event in events}.values())
-
-
-def _fetch_timetree_ics(args: argparse.Namespace) -> None:
-    command = [sys.executable, "-m", "timetree_exporter", "-o", str(args.output)]
-    email = args.email or os.environ.get("TIMETREE_EMAIL")
-    if email:
-        command.extend(["-e", email])
-    if args.calendar_code:
-        command.extend(["-c", args.calendar_code])
-
-    env = os.environ.copy()
-    print("Fetching TimeTree ICS...")
-    subprocess.run(command, check=True, env=env)
 
 
 def run_sync(args: argparse.Namespace) -> int:

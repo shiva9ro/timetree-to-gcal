@@ -2,5 +2,5 @@ google-api-python-client>=2.134.0
 google-auth>=2.14.1,<2.41.0
 google-auth-httplib2>=0.2.0
 google-auth-oauthlib>=1.2.0
-timetree-exporter>=0.7.2,<0.8.0
+icalendar>=7.1.0,<8.0.0
 tzdata>=2024.1
