@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync TimeTree events to Google Calendar
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/timetree-to-gcal
+Environment=TZ=Asia/Tokyo
+ExecStart=%h/timetree-to-gcal/sync-timetree.sh
+NoNewPrivileges=true
+PrivateTmp=true

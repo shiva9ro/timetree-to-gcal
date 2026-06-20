@@ -1,0 +1,11 @@
+[Unit]
+Description=Run TimeTree to Google Calendar sync before Alexa routines
+
+[Timer]
+OnCalendar=*-*-* 07:35:00 Asia/Tokyo
+OnCalendar=*-*-* 20:35:00 Asia/Tokyo
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
