@@ -1,9 +1,13 @@
 [Unit]
 Description=Sync TimeTree events to Google Calendar
+StartLimitIntervalSec=5min
+StartLimitBurst=4
 
 [Service]
 Type=oneshot
 WorkingDirectory=%h/timetree-to-gcal
 ExecStart=%h/timetree-to-gcal/.venv/bin/python -m time_tree_exporter sync-timetree
+Restart=on-failure
+RestartSec=30s
 NoNewPrivileges=true
 PrivateTmp=true
