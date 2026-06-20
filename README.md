@@ -56,33 +56,36 @@ Google Cloudで作成したOAuthクライアントを `credentials.json` とし�
 
 ## Run
 
-### Windows
+仮想環境を有効化した後の実行コマンドは、WindowsとLinuxで共通です。
+
+### Activate the virtual environment
+
+Windows PowerShell:
 
 ```powershell
-.\sync-timetree.ps1 -CalendarId "GoogleカレンダーID"
+.\.venv\Scripts\Activate.ps1
 ```
 
-`.env` に `GOOGLE_CALENDAR_ID` があれば、Python CLIを直接実行することもできます。
-
-```powershell
-.\.venv\Scripts\python.exe -m time_tree_exporter sync-timetree
-```
-
-### Linux / Raspberry Pi
+Linux / Raspberry Pi:
 
 ```bash
-.venv/bin/python -m time_tree_exporter sync-timetree
+source .venv/bin/activate
+```
+
+### Sync
+
+```bash
+python -m time_tree_exporter sync-timetree
 ```
 
 キャッシュを破棄して全件取得し直す場合:
 
-```powershell
-.\sync-timetree.ps1 -CalendarId "GoogleカレンダーID" -FullRefresh
+```bash
+python -m time_tree_exporter sync-timetree --full-refresh
 ```
 
-```bash
-.venv/bin/python -m time_tree_exporter sync-timetree --full-refresh
-```
+自動実行では仮想環境を対話的に有効化せず、仮想環境内のPythonを直接指定します。
+`deploy/systemd/timetree-to-gcal.service` も同じPythonモジュールを実行します。
 
 ## Delta Sync
 
