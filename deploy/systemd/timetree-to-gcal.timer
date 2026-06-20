@@ -2,8 +2,8 @@
 Description=Run TimeTree to Google Calendar sync before Alexa routines
 
 [Timer]
-OnCalendar=*-*-* 07:35:00 Asia/Tokyo
-OnCalendar=*-*-* 20:35:00 Asia/Tokyo
+OnCalendar=*-*-* 07:35:00
+OnCalendar=*-*-* 20:35:00
 Persistent=true
 AccuracySec=1min
 

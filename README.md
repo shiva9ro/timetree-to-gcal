@@ -71,7 +71,7 @@ Google Cloudで作成したOAuthクライアントを `credentials.json` とし�
 ### Linux / Raspberry Pi
 
 ```bash
-./sync-timetree.sh
+.venv/bin/python -m time_tree_exporter sync-timetree
 ```
 
 キャッシュを破棄して全件取得し直す場合:
