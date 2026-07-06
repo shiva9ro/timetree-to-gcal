@@ -56,32 +56,25 @@ Google Cloudで作成したOAuthクライアントを `credentials.json` とし�
 
 ## Run
 
-仮想環境を有効化した後の実行コマンドは、WindowsとLinuxで共通です。
-
-### Activate the virtual environment
+WindowsとLinuxは、どちらも仮想環境内のPythonから同じモジュールと
+サブコマンドを実行します。仮想環境の有効化は不要です。
 
 Windows PowerShell:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\python.exe -m time_tree_exporter sync-timetree
 ```
 
 Linux / Raspberry Pi:
 
 ```bash
-source .venv/bin/activate
-```
-
-### Sync
-
-```bash
-python -m time_tree_exporter sync-timetree
+.venv/bin/python -m time_tree_exporter sync-timetree
 ```
 
 キャッシュを破棄して全件取得し直す場合:
 
-```bash
-python -m time_tree_exporter sync-timetree --full-refresh
+```text
+<仮想環境のPython> -m time_tree_exporter sync-timetree --full-refresh
 ```
 
 自動実行では仮想環境を対話的に有効化せず、仮想環境内のPythonを直接指定します。
