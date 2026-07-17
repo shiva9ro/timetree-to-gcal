@@ -339,7 +339,13 @@ def _filter_window(events: list[IcsEvent], days_back: int, days_ahead: int) -> l
     today = date.today()
     start = today - timedelta(days=days_back)
     end = today + timedelta(days=days_ahead)
-    return [event for event in events if start <= _event_date(event.start) <= end]
+    return [
+        event
+        for event in events
+        if event.recurrence
+        or event.rrule
+        or start <= _event_date(event.start) <= end
+    ]
 
 
 def _event_date(value: date | datetime) -> date:
