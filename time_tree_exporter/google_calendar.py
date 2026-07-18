@@ -127,6 +127,7 @@ def find_event_by_timetree_uid(service, calendar_id: str, uid: str) -> dict[str,
 
 
 def to_google_event(event: IcsEvent, default_tz: str) -> dict[str, Any]:
+    recurring = bool(event.recurrence or event.rrule)
     body: dict[str, Any] = {
         "summary": event.summary,
         "extendedProperties": {"private": {"timetreeUid": event.uid, SYNC_MARKER: "1"}},
@@ -141,8 +142,10 @@ def to_google_event(event: IcsEvent, default_tz: str) -> dict[str, Any]:
     elif event.rrule:
         body["recurrence"] = [f"RRULE:{event.rrule}"]
 
-    body["start"] = _google_datetime(event.start, default_tz)
-    body["end"] = _google_datetime(event.end or _fallback_end(event.start), default_tz)
+    body["start"] = _google_datetime(event.start, default_tz, recurring)
+    body["end"] = _google_datetime(
+        event.end or _fallback_end(event.start), default_tz, recurring
+    )
     return body
 
 
@@ -152,10 +155,12 @@ def _fallback_end(value: date | datetime) -> date | datetime:
     return value + timedelta(days=1)
 
 
-def _google_datetime(value: date | datetime, default_tz: str) -> dict[str, str]:
+def _google_datetime(
+    value: date | datetime, default_tz: str, require_time_zone: bool = False
+) -> dict[str, str]:
     if isinstance(value, datetime):
         payload = {"dateTime": value.isoformat()}
-        if value.tzinfo is None:
+        if value.tzinfo is None or require_time_zone:
             payload["timeZone"] = default_tz
         return payload
     return {"date": value.isoformat()}
