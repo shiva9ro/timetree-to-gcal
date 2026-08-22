@@ -69,6 +69,20 @@ def main() -> int:
     sync_tt.add_argument("--full-refresh", action="store_true", help="Discard the delta cursor and fetch all TimeTree events")
     sync_tt.add_argument("--no-label-prefix", action="store_true", help="Do not prefix Google event titles with TimeTree label names")
 
+    create_tt = subcommands.add_parser(
+        "create-timetree-event",
+        help="Validate one JSON event and optionally create it in TimeTree",
+    )
+    create_tt.add_argument("--input", type=Path, required=True, help="JSON event file")
+    create_tt.add_argument("--email", help="TimeTree email address. Can also use TIMETREE_EMAIL.")
+    create_tt.add_argument("--calendar-code", help="TimeTree calendar code")
+    create_tt.add_argument("--time-zone", default="Asia/Tokyo")
+    create_tt.add_argument(
+        "--commit",
+        action="store_true",
+        help="Actually create the event. Without this flag, only print the resolved request.",
+    )
+
     args = parser.parse_args()
     if args.command == "sync":
         return run_sync(args)
@@ -80,6 +94,8 @@ def main() -> int:
         return run_delete_ics_events(args)
     if args.command == "sync-timetree":
         return run_sync_timetree(args)
+    if args.command == "create-timetree-event":
+        return run_create_timetree_event(args)
     return 1
 
 
@@ -93,6 +109,86 @@ def run_make_ics(args: argparse.Namespace) -> int:
 def run_sanitize_ics(args: argparse.Namespace) -> int:
     count = sanitize_ics_for_google(args.ics, args.output)
     print(f"Wrote {count} event(s) to {args.output}")
+    return 0
+
+
+def run_create_timetree_event(args: argparse.Namespace) -> int:
+    import json
+
+    from .timetree_api import (
+        TimeTreeClient,
+        build_create_event_payload,
+        resolve_label_id,
+    )
+
+    email = args.email or os.environ.get("TIMETREE_EMAIL")
+    password = os.environ.get("TIMETREE_PASSWORD")
+    calendar_code = args.calendar_code or os.environ.get("TIMETREE_CALENDAR_CODE")
+    if not email or not password or not calendar_code:
+        print("TIMETREE_EMAIL, TIMETREE_PASSWORD and TIMETREE_CALENDAR_CODE are required.")
+        return 2
+
+    source = json.loads(args.input.read_text(encoding="utf-8"))
+    sources = source if isinstance(source, list) else [source]
+    if not sources:
+        print("Invalid event: input must contain at least one event.")
+        return 2
+    client = TimeTreeClient(email, password)
+    calendar = client.calendar_by_code(calendar_code)
+    labels = client.fetch_labels(calendar["id"])
+    try:
+        payloads = [
+            build_create_event_payload(
+                item,
+                label_id=resolve_label_id(labels, item.get("label")),
+                time_zone=args.time_zone,
+            )
+            for item in sources
+        ]
+    except ValueError as exc:
+        print(f"Invalid event: {exc}")
+        return 2
+
+    if not args.commit:
+        print("DRY RUN: no TimeTree event was created.")
+        print(json.dumps(payloads if isinstance(source, list) else payloads[0], ensure_ascii=False, indent=2))
+        return 0
+
+    existing = client.fetch_all_events(calendar["id"]).events
+    existing_keys = {
+        (
+            event.get("title"),
+            event.get("start_at"),
+            event.get("end_at"),
+            event.get("location") or "",
+        )
+        for event in existing
+        if event.get("deactivated_at") is None
+    }
+    created_ids: list[str] = []
+    skipped = 0
+    for payload in payloads:
+        key = (
+            payload.get("title"),
+            payload.get("start_at"),
+            payload.get("end_at"),
+            payload.get("location") or "",
+        )
+        if key in existing_keys:
+            skipped += 1
+            continue
+        try:
+            result = client.create_event(calendar["id"], payload)
+        except RuntimeError as exc:
+            print(exc)
+            print(f"Created {len(created_ids)}, skipped {skipped}, then stopped.")
+            return 3
+        created = result.get("event", result)
+        created_ids.append(str(created.get("uuid") or created.get("id") or ""))
+        existing_keys.add(key)
+    print(f"Created {len(created_ids)} TimeTree event(s); skipped {skipped} existing event(s).")
+    for event_id in created_ids:
+        print(event_id or "(unknown id)")
     return 0
 
 

@@ -11,3 +11,6 @@ sync-state.json
 timetree-cache.json
 timetree-labels.json
 raw-timetree*/
+
+# Personal rules and schedule data used for one-off TimeTree imports
+data/

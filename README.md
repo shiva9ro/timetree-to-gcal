@@ -114,6 +114,24 @@ timetree-labels.json
 このプロジェクトはTimeTree公式ではありません。TimeTreeの内部APIを利用しているため、
 仕様変更によって動作しなくなる可能性があります。短い間隔でのポーリングは避けてください。
 
+## TimeTreeへの予定登録CLI（同期とは別機能）
+
+登録用JSONは月ごとに `data/imports/YYYY-MM/` へ保存します。
+対象者や予定選別の個人ルールは `data/schedule-import-rules.md` に記録します。
+Git管理できる一般例は `docs/schedule-import-rules.example.md` にあります。
+次のコマンドはカレンダーとラベルを読み取って送信内容を表示するだけで、予定は作成しません。
+
+```powershell
+.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json
+```
+
+JSONの `label` にはTimeTree上のラベル名を指定します。`null` ならラベルを明示しません。
+実際に作成するときだけ末尾に `--commit` を付けます。
+
+```powershell
+.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json --commit
+```
+
 ## Acknowledgements
 
 内部APIの調査と初期ICS出力の検証では、MIT Licenseの

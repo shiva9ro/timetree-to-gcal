@@ -1,0 +1,20 @@
+[
+  {
+    "title": "サンプル予定",
+    "all_day": false,
+    "start_date": "2026-08-01",
+    "start_time": "09:00",
+    "end_date": "2026-08-01",
+    "end_time": "10:00",
+    "location": "サンプル会場",
+    "note": "dry-runで内容を確認してから登録してください",
+    "label": null
+  },
+  {
+    "title": "終日予定の例",
+    "all_day": true,
+    "start_date": "2026-08-02",
+    "end_date": "2026-08-02",
+    "label": null
+  }
+]

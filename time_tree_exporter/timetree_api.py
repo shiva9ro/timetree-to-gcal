@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -27,6 +28,7 @@ class FetchResult:
 class TimeTreeClient:
     def __init__(self, email: str, password: str):
         self.session = requests.Session()
+        self._csrf_token: str | None = None
         self._login(email, password)
 
     def _login(self, email: str, password: str) -> None:
@@ -85,6 +87,43 @@ class TimeTreeClient:
                 }
         return labels
 
+    def create_event(self, calendar_id: int, event: dict[str, Any]) -> dict[str, Any]:
+        headers = {
+            **API_HEADERS,
+            "X-CSRF-Token": self._get_csrf_token(),
+        }
+        response = self.session.post(
+            f"{API_BASE_URL}/calendar/{calendar_id}/event",
+            json=event,
+            headers=headers,
+            timeout=20,
+        )
+        if not response.ok:
+            detail = response.text.strip()
+            raise RuntimeError(
+                f"TimeTree create event failed ({response.status_code}): {detail}"
+            )
+        return response.json()
+
+    def _get_csrf_token(self) -> str:
+        if self._csrf_token:
+            return self._csrf_token
+        response = self.session.get(
+            "https://timetreeapp.com/calendars",
+            headers=API_HEADERS,
+            timeout=20,
+        )
+        response.raise_for_status()
+        match = re.search(
+            r'<meta[^>]+name=["\']csrf-token["\'][^>]+content=["\']([^"\']+)',
+            response.text,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            raise RuntimeError("TimeTree CSRF token was not found.")
+        self._csrf_token = match.group(1)
+        return self._csrf_token
+
     def fetch_changed_events(self, calendar_id: int, since: int) -> FetchResult:
         events: list[dict[str, Any]] = []
         cursor = since
@@ -125,6 +164,72 @@ def write_json(path: Path, value: Any) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def build_create_event_payload(
+    event: dict[str, Any],
+    *,
+    label_id: int | None = None,
+    time_zone: str = "Asia/Tokyo",
+) -> dict[str, Any]:
+    title = str(event.get("title") or "").strip()
+    if not title:
+        raise ValueError("title is required.")
+
+    all_day = bool(event.get("all_day"))
+    start_date = _parse_iso_date(event.get("start_date"), "start_date")
+    end_date = _parse_iso_date(event.get("end_date") or event.get("start_date"), "end_date")
+    if end_date < start_date:
+        raise ValueError("end_date must not be before start_date.")
+
+    payload: dict[str, Any] = {
+        "title": title,
+        "all_day": all_day,
+    }
+    if all_day:
+        payload["start_at"] = _epoch_milliseconds(start_date, None, "UTC")
+        payload["end_at"] = _epoch_milliseconds(end_date, None, "UTC")
+    else:
+        start_time = _parse_iso_time(event.get("start_time"), "start_time")
+        end_time = _parse_iso_time(event.get("end_time"), "end_time")
+        payload["start_at"] = _epoch_milliseconds(start_date, start_time, time_zone)
+        payload["end_at"] = _epoch_milliseconds(end_date, end_time, time_zone)
+        if payload["end_at"] < payload["start_at"]:
+            raise ValueError("Event end must not be before event start.")
+        payload["start_timezone"] = time_zone
+        payload["end_timezone"] = time_zone
+
+    for source, target in (
+        ("location", "location"),
+        ("url", "url"),
+        ("note", "note"),
+        ("recurrences", "recurrences"),
+        ("attendees", "attendees"),
+        ("alerts", "alerts"),
+    ):
+        value = event.get(source)
+        if value not in (None, "", []):
+            payload[target] = value
+    if label_id is not None:
+        payload["label_id"] = label_id
+    return payload
+
+
+def resolve_label_id(
+    labels: dict[str, dict[str, Any]], label_name: str | None
+) -> int | None:
+    if not label_name:
+        return None
+    matches = [
+        int(label_id)
+        for label_id, label in labels.items()
+        if str(label.get("name") or "").strip().casefold() == label_name.strip().casefold()
+    ]
+    if not matches:
+        raise ValueError(f"TimeTree label not found: {label_name}")
+    if len(matches) > 1:
+        raise ValueError(f"TimeTree label name is ambiguous: {label_name}")
+    return matches[0]
 
 
 def merge_events(
@@ -176,6 +281,32 @@ def _event_datetime(value: int | None, tzid: str | None, all_day: bool) -> date 
     tz = ZoneInfo(tzid or "Asia/Tokyo")
     parsed = datetime.fromtimestamp(value / 1000, tz=timezone.utc).astimezone(tz)
     return parsed.date() if all_day else parsed
+
+
+def _parse_iso_date(value: Any, field: str) -> date:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} is required in YYYY-MM-DD format.")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must use YYYY-MM-DD format.") from exc
+
+
+def _parse_iso_time(value: Any, field: str):
+    if not isinstance(value, str):
+        raise ValueError(f"{field} is required in HH:MM format for timed events.")
+    try:
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError as exc:
+        raise ValueError(f"{field} must use HH:MM format.") from exc
+
+
+def _epoch_milliseconds(day: date, clock, time_zone: str) -> int:
+    if clock is None:
+        value = datetime.combine(day, datetime.min.time(), tzinfo=ZoneInfo(time_zone))
+    else:
+        value = datetime.combine(day, clock, tzinfo=ZoneInfo(time_zone))
+    return int(value.timestamp() * 1000)
 
 
 def _next_since(events: list[dict[str, Any]], default: int = 0) -> int:
