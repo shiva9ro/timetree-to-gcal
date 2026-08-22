@@ -150,10 +150,3 @@ JSONの `label` にはTimeTree上のラベル名を指定します。`null` な�
 ```powershell
 .\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json --commit
 ```
-
-## Acknowledgements
-
-内部APIの調査と初期ICS出力の検証では、MIT Licenseの
-[eoleedi/TimeTree-Exporter](https://github.com/eoleedi/TimeTree-exporter) を参考にしました。
-現在の通常同期は同パッケージを依存関係として使用せず、
-このプロジェクト内の差分同期クライアントで動作します。
