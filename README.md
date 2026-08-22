@@ -10,7 +10,7 @@ Alexaの定型アクションから当日・翌日の予定を読み上げる用
 - Google Calendarへの新規作成・変更・削除
 - TimeTreeのラベル名を `【ラベル名】予定タイトル` として反映
 - ローカルキャッシュによる同期範囲への予定追加
-- Windows PowerShellとLinux/Raspberry Piに対応
+- Windows 11 on Armで開発・テストし、Raspberry Pi 5で定期実行
 
 ## Requirements
 
@@ -91,7 +91,8 @@ Linux / Raspberry Pi:
 
 ## Scheduling
 
-Alexaが07:45と20:45に読み上げる場合、07:35と20:35の同期を想定しています。
+Alexaが07:45に当日の予定、20:45に翌日の予定を読み上げるため、
+その10分前の07:35と20:35に同期する構成を想定しています。
 
 systemdのユーザーサービスとタイマー例は `deploy/systemd` にあります。
 配置先は `%h/timetree-to-gcal` です。
@@ -107,6 +108,9 @@ token.json
 sync-state.json
 timetree-cache.json
 timetree-labels.json
+*.ics
+raw-timetree*/
+data/
 ```
 
 ## Disclaimer
