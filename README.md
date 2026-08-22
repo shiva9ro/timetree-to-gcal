@@ -116,6 +116,25 @@ timetree-labels.json
 
 ## TimeTreeへの予定登録CLI（同期とは別機能）
 
+関連ファイルは次のとおりです。
+
+| 内容 | ファイル |
+| --- | --- |
+| 登録用JSONの例 | [`examples/timetree-events.example.json`](examples/timetree-events.example.json) |
+| CLIとdry-run・重複確認 | [`time_tree_exporter/cli.py`](time_tree_exporter/cli.py) |
+| TimeTreeへの登録とJSON変換 | [`time_tree_exporter/timetree_api.py`](time_tree_exporter/timetree_api.py) |
+| AIへ渡す予定選別ルールの例 | [`docs/schedule-import-rules.example.md`](docs/schedule-import-rules.example.md) |
+
+処理の流れは次のとおりです。
+
+```text
+自由形式の連絡文
+  → AIで共通JSONへ整形
+  → 人が内容を確認
+  → create-timetree-eventでdry-run
+  → --commitを付けてTimeTreeへ登録
+```
+
 登録用JSONは月ごとに `data/imports/YYYY-MM/` へ保存します。
 対象者や予定選別の個人ルールは `data/schedule-import-rules.md` に記録します。
 Git管理できる一般例は `docs/schedule-import-rules.example.md` にあります。
