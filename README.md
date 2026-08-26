@@ -1,22 +1,29 @@
 # TimeTree to Google Calendar
 
-TimeTreeの予定を差分取得し、Google Calendarへ同期する非公式ツールです。
-Alexaの定型アクションから当日・翌日の予定を読み上げる用途を想定しています。
+English | [日本語](README.ja.md)
+
+An unofficial Python tool that incrementally syncs TimeTree events to Google Calendar.
+It is designed to make TimeTree schedules available to Alexa routines through Google Calendar.
+
+For the background and setup story in Japanese, see the
+[Qiita article](https://qiita.com/shiva9ro/items/456f4450854b799683f7).
 
 ## Features
 
-- 初回のみTimeTreeのイベントを全件取得
-- 2回目以降は `since` カーソルによる差分取得
-- Google Calendarへの新規作成・変更・削除
-- TimeTreeのラベル名を `【ラベル名】予定タイトル` として反映
-- ローカルキャッシュによる同期範囲への予定追加
-- Windows 11 on Armで開発・テストし、Raspberry Pi 5で定期実行
+- Fetch all TimeTree events on the first run
+- Fetch only changes on later runs using a `since` cursor
+- Create, update, and delete Google Calendar events
+- Prefix titles with their TimeTree label, such as `【School】Parent observation day`
+- Add unchanged events when they enter the configured sync window
+- Create TimeTree events from JSON with dry-run and duplicate checking
+- Sync ICS files, generate ICS from CSV, and sanitize ICS for Google Calendar
+- Run periodically on Raspberry Pi with a systemd user timer
 
 ## Requirements
 
-- Python 3.11以上
-- Google Calendar APIのDesktop OAuthクライアント
-- TimeTreeのメールアドレス、パスワード、カレンダーコード
+- Python 3.11 or later
+- A Google Calendar API Desktop OAuth client
+- A TimeTree email address, password, and calendar code
 
 ## Setup
 
@@ -40,7 +47,7 @@ chmod 600 .env credentials.json token.json
 
 ## Configuration
 
-`.env`:
+Set the following values in `.env`:
 
 ```text
 TIMETREE_EMAIL=your-email@example.com
@@ -49,15 +56,12 @@ TIMETREE_CALENDAR_CODE=your-calendar-code
 GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
 ```
 
-Google Cloudで作成したOAuthクライアントを `credentials.json` として配置します。
-初回認証後は `token.json` が作成されます。
+Create a Desktop OAuth client in Google Cloud and save it as `credentials.json`.
+The first run opens a browser for authorization and then saves the credentials to `token.json`.
 
-これらのファイルはGit管理対象外です。
+These files are excluded from Git.
 
-## Run
-
-WindowsとLinuxは、どちらも仮想環境内のPythonから同じモジュールと
-サブコマンドを実行します。仮想環境の有効化は不要です。
+## Sync TimeTree to Google Calendar
 
 Windows PowerShell:
 
@@ -71,35 +75,100 @@ Linux / Raspberry Pi:
 .venv/bin/python -m time_tree_exporter sync-timetree
 ```
 
-キャッシュを破棄して全件取得し直す場合:
+Discard the local cursor and fetch all events again:
 
 ```text
-<仮想環境のPython> -m time_tree_exporter sync-timetree --full-refresh
+<virtual-environment-python> -m time_tree_exporter sync-timetree --full-refresh
 ```
 
-自動実行では仮想環境を対話的に有効化せず、仮想環境内のPythonを直接指定します。
-`deploy/systemd/timetree-to-gcal.service` も同じPythonモジュールを実行します。
+Automated jobs call the Python executable inside the virtual environment directly. Activating the
+environment interactively is not required.
 
-## Delta Sync
+## How delta sync works
 
-- 初回イベントを `timetree-cache.json` に保存します。
-- 最大 `updated_at + 1` を `sync-state.json` に保存します。
-- 以後は `/events?since=...` から変更分だけ取得します。
-- `deactivated_at` が設定された予定はGoogle Calendarから削除します。
-- 日付が変わると、新しく同期範囲へ入った予定だけをGoogle Calendarへ追加します。
-- 変更がなければ、TimeTreeは1リクエスト、Googleの予定操作は0件です。
+- The first run saves TimeTree events to `timetree-cache.json`.
+- The next cursor, calculated as the largest `updated_at + 1`, is saved to `sync-state.json`.
+- Later runs request changes from `/events?since=...`.
+- Events with `deactivated_at` are removed from Google Calendar.
+- When the date changes, unchanged events entering the sync window are added.
+- With no changes, TimeTree receives one request and Google Calendar receives no event operations.
 
-## Scheduling
+## Create TimeTree events from JSON
 
-Alexaが07:45に当日の予定、20:45に翌日の予定を読み上げるため、
-その10分前の07:35と20:35に同期する構成を想定しています。
+This is a separate workflow from calendar synchronization. It accepts event data normalized into a
+common JSON format, allows a person to review it, and supports a dry run before writing to TimeTree.
+See [`examples/timetree-events.example.json`](examples/timetree-events.example.json) for the input
+format.
 
-systemdのユーザーサービスとタイマー例は `deploy/systemd` にあります。
-配置先は `%h/timetree-to-gcal` です。
+```text
+Unstructured schedule notice
+  -> normalize to common JSON
+  -> review manually
+  -> dry-run with create-timetree-event
+  -> add --commit to create the events
+```
+
+The following command resolves the calendar and labels and prints the request without creating an
+event:
+
+```powershell
+.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json
+```
+
+Set `label` to a TimeTree label name, or use `null` to omit an explicit label. Add `--commit` only
+when the reviewed events are ready to be created:
+
+```powershell
+.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json --commit
+```
+
+An example of schedule-selection rules is available in
+[`docs/schedule-import-rules.example.md`](docs/schedule-import-rules.example.md). Keep personal rules
+and input data in the Git-ignored `data/` directory.
+
+## Other commands
+
+Run `<virtual-environment-python> -m time_tree_exporter --help` to see all options.
+
+| Command | Purpose |
+| --- | --- |
+| `sync-timetree` | Incrementally sync TimeTree events to Google Calendar |
+| `create-timetree-event` | Validate JSON and optionally create TimeTree events |
+| `sync` | Sync events from an ICS file to Google Calendar |
+| `make-ics` | Generate an ICS file from CSV |
+| `sanitize-ics` | Create a Google Calendar-friendly ICS file |
+| `delete-ics-events` | Delete Google Calendar events whose iCalUIDs occur in an ICS file |
+
+## Schedule with systemd
+
+The included user timer runs at 07:35 and 20:35, ten minutes before the example Alexa routines at
+07:45 and 20:45. The service expects this repository at `~/timetree-to-gcal`.
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/systemd/timetree-to-gcal.service ~/.config/systemd/user/
+cp deploy/systemd/timetree-to-gcal.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now timetree-to-gcal.timer
+```
+
+Check the timer and its next run:
+
+```bash
+systemctl --user status timetree-to-gcal.timer
+systemctl --user list-timers timetree-to-gcal.timer
+```
+
+Run a sync manually and inspect recent logs:
+
+```bash
+systemctl --user start timetree-to-gcal.service
+journalctl --user -u timetree-to-gcal.service -n 50 --no-pager
+```
 
 ## Security
 
-次のファイルはGitへ追加しないでください。
+Do not add the following files to Git:
 
 ```text
 .env
@@ -115,46 +184,9 @@ data/
 
 ## Disclaimer
 
-このプロジェクトはTimeTree公式ではありません。TimeTreeの内部APIを利用しているため、
-仕様変更によって動作しなくなる可能性があります。短い間隔でのポーリングは避けてください。
+This project is not affiliated with TimeTree. It uses an internal TimeTree API and may stop working
+when that API changes. Avoid frequent polling.
 
 ## License
 
 [MIT License](LICENSE)
-
-## TimeTreeへの予定登録CLI（同期とは別機能）
-
-関連ファイルは次のとおりです。
-
-| 内容 | ファイル |
-| --- | --- |
-| 登録用JSONの例 | [`examples/timetree-events.example.json`](examples/timetree-events.example.json) |
-| CLIとdry-run・重複確認 | [`time_tree_exporter/cli.py`](time_tree_exporter/cli.py) |
-| TimeTreeへの登録とJSON変換 | [`time_tree_exporter/timetree_api.py`](time_tree_exporter/timetree_api.py) |
-| AIへ渡す予定選別ルールの例 | [`docs/schedule-import-rules.example.md`](docs/schedule-import-rules.example.md) |
-
-処理の流れは次のとおりです。
-
-```text
-自由形式の連絡文
-  → AIで共通JSONへ整形
-  → 人が内容を確認
-  → create-timetree-eventでdry-run
-  → --commitを付けてTimeTreeへ登録
-```
-
-登録用JSONは月ごとに `data/imports/YYYY-MM/` へ保存します。
-対象者や予定選別の個人ルールは `data/schedule-import-rules.md` に記録します。
-Git管理できる一般例は `docs/schedule-import-rules.example.md` にあります。
-次のコマンドはカレンダーとラベルを読み取って送信内容を表示するだけで、予定は作成しません。
-
-```powershell
-.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json
-```
-
-JSONの `label` にはTimeTree上のラベル名を指定します。`null` ならラベルを明示しません。
-実際に作成するときだけ末尾に `--commit` を付けます。
-
-```powershell
-.\.venv\Scripts\python.exe -m time_tree_exporter create-timetree-event --input examples\timetree-events.example.json --commit
-```
