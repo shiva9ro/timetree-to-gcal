@@ -5,9 +5,6 @@ English | [日本語](README.ja.md)
 An unofficial Python tool that incrementally syncs TimeTree events to Google Calendar.
 It is designed to make TimeTree schedules available to Alexa routines through Google Calendar.
 
-For the background and setup story in Japanese, see the
-[Qiita article](https://qiita.com/shiva9ro/items/456f4450854b799683f7).
-
 ## Features
 
 - Fetch all TimeTree events on the first run
@@ -186,6 +183,10 @@ data/
 
 This project is not affiliated with TimeTree. It uses an internal TimeTree API and may stop working
 when that API changes. Avoid frequent polling.
+
+## Related articles
+
+- [TimeTreeの予定をGoogleカレンダーへ差分同期するツールを作った (Qiita, Japanese)](https://qiita.com/shiva9ro/items/456f4450854b799683f7)
 
 ## License
 

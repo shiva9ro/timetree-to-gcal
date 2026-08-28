@@ -5,9 +5,6 @@
 TimeTreeの予定を差分取得し、Google Calendarへ同期する非公式のPythonツールです。
 Google Calendarを経由し、Alexaの定型アクションからTimeTreeの予定を読み上げる用途を想定しています。
 
-開発の背景や構成については
-[Qiitaの記事](https://qiita.com/shiva9ro/items/456f4450854b799683f7)も参照してください。
-
 ## 主な機能
 
 - 初回のみTimeTreeのイベントを全件取得
@@ -184,6 +181,10 @@ data/
 
 このプロジェクトはTimeTree公式ではありません。TimeTreeの内部APIを利用しているため、
 仕様変更によって動作しなくなる可能性があります。短い間隔での実行は避けてください。
+
+## 関連記事
+
+- [TimeTreeの予定をGoogleカレンダーへ差分同期するツールを作った（Qiita）](https://qiita.com/shiva9ro/items/456f4450854b799683f7)
 
 ## ライセンス
 
